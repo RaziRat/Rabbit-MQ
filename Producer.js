@@ -1,28 +1,26 @@
 const amqp = require("amqplib");
-const { send } = require("process");
-const { buffer } = require("stream/consumers");
-
-const annProduct = async (product) => {
-try{
-
+async function setup(message) {
     const connection = await amqp.connect("amqp://localhost");
     const channel = await connection.createChannel();
-    const exchange = "new_product";
-    const exchangeType = "fanout";
 
-    await channel.assertExchange(exchange, exchangeType, {durable: true});
-    const message = JSON.stringify(product)
+    const exchangeName = "noti_exchange";
+    const queueName = "lazy_queue";
+    const routingKey = "notification.key";
 
-    channel.publish(exchange, "", Buffer.from(message), {persistent: true});
-    console.log("Sent => ", message);
+    await channel.assertExchange(exchangeName, "direct", {durable: true});
+
+    await channel.assertQueue(queueName, {
+        durable: true,
+        arguments: {
+            "x-queue-mode": "lazy",
+        },
+    });
+    await channel.bindQueue(queueName, exchangeName, routingKey);
+    channel.publish(exchangeName, routingKey, Buffer.from(message),{persistent:true},);
+    console.log(`Message Sent: ${message}`);
+
+    await channel.close();
+    await connection.close();
     
-    setTimeout(() =>{
-        connection.close();
-    },500);
-}
-catch(error){
-    console.log(error);
-}
-}
-annProduct({ orderId: 12345 , name: "iphone 18", price: 400000});
- 
+};
+setup("Hello message");
